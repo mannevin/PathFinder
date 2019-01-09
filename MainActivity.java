@@ -69,12 +69,9 @@ import retrofit2.Response;
 
 public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, LocationEngineListener, PermissionsListener, MapboxMap.OnMapClickListener, AdapterView.OnItemClickListener {
     private static final String TAG = "MainActivity";
-
-    //Buttons and text editors for text to speech
-    //text sms variables
-    private static final int PERMISSION_REQUEST_CODE = 1;
-    private static final UUID MY_UUID_INSECURE =
-            UUID.fromString("8ce255c0-200a-11e0-ac64-0800200c9a66");
+    private final String[] PERMISSIONS = new String[]{Manifest.permission.CAMERA};
+    private final int REQUEST_CODE_DETECTION = 0;
+    private final int REQUEST_CODE_TRACK = 1;
     //Create a BroadcastReciever for ACTION_FOUND
     private final BroadcastReceiver mBroadcastReciever1 = new BroadcastReceiver() {
         @Override
@@ -102,7 +99,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     };
 
-    //maps and buttons for main map
+    //Buttons and text editors for text to speech
     private final BroadcastReceiver mBroadcastReceiver2 = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -137,6 +134,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     };
     public ArrayList<BluetoothDevice> mBTDevices = new ArrayList<>();
     public DeviceListAdapter mDeviceListAdapter;
+
+    //maps and buttons for main map
     BluetoothAdapter mBluetoothAdapter;
     Button btnEnableDisable_Discoverable;
     BluetoothConnectionService mBluetoothConnection;
@@ -172,17 +171,24 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     ListView lvNewDevices;
     //calling variables
     Button callButton;
+    //object identification tools
+    private PermissionsManager mPermissionsManager;
     //text view for speech to text
     private TextView txvResult;
+    //text sms variables
+    private static final int PERMISSION_REQUEST_CODE = 1;
+    private TextToSpeech mTTS;
 
     //Bluetooth Adapter and button to connect to bluetooth devices
-    private TextToSpeech mTTS;
     private EditText mEditText;
     private Button mButtonSpeak;
     private MapView mapView;
     private MapboxMap map;
     private Button startButton;
     private PermissionsManager permissionsManager;
+
+    private static final UUID MY_UUID_INSECURE =
+            UUID.fromString("8ce255c0-200a-11e0-ac64-0800200c9a66");
     private LocationEngine locationEngine;
     private LocationLayerPlugin locationLayerPlugin;
     private Location originLocation;
@@ -215,6 +221,31 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        mPermissionsManager = new PermissionsManager(this) {
+            @Override
+            public void authorized(int requestCode) {
+                switch (requestCode) {
+                    case REQUEST_CODE_DETECTION:
+                        startActivity(new Intent(MainActivity.this, ObjectDetectingActivity.class));
+                        break;
+                    case REQUEST_CODE_TRACK:
+                        startActivity(new Intent(MainActivity.this, ObjectTrackingActivity.class));
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            @Override
+            public void noAuthorization(int requestCode, String[] lacksPermissions) {
+                showPermissionDialog();
+            }
+
+            @Override
+            public void ignore(int requestCode) {
+                authorized(requestCode);
+            }
+        };
         final EditText phoneNumber = findViewById(R.id.phoneNumber);
         if (Build.VERSION.SDK_INT >= 23) {
             if (checkPermission()) {
@@ -337,6 +368,19 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         });
     }
 
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        mPermissionsManager.recheckPermissions(requestCode, permissions, grantResults);
+    }
+
+    public void onDetecting(View view) {
+        mPermissionsManager.checkPermissions(REQUEST_CODE_DETECTION, PERMISSIONS);
+    }
+
+    public void onTracking(View view) {
+        mPermissionsManager.checkPermissions(REQUEST_CODE_TRACK, PERMISSIONS);
+    }
+
     private boolean checkPermission() {
         int result = ContextCompat.checkSelfPermission(SMSActivity.this, Manifest.permission.SEND_SMS);
         return result == PackageManager.PERMISSION_GRANTED;
@@ -369,7 +413,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
         mTTS.speak(text, TextToSpeech.QUEUE_FLUSH, null);
     }
-
     //gets speech input
     public void getSpeechInput(View view) {
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
@@ -528,7 +571,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         startButton.setEnabled(true);
         startButton.setBackgroundResource(R.color.mapboxBlue);
     }
-
     //Method to build a route to the destination from the current location of the user
     private void getRoute(com.mapbox.geojson.Point origin, com.mapbox.geojson.Point destination) {
         NavigationRoute.builder()
@@ -559,7 +601,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         //replace the old route with the new route
                         navigationMapRoute.addRoute(currentRoute);
                     }
-
                     //if the route is not create execute the method
                     @Override
                     public void onFailure(Call<DirectionsResponse> call, Throwable t) {
@@ -587,13 +628,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             setCameraPosition(location);
         }
     }
-
     //this method is not required
     @Override
     public void onExplanationNeeded(List<String> permissionsToExplain) {
 
     }
-
     //if the locations permission needs to be granted execute this method
     @Override
     public void onPermissionResult(boolean granted) {
@@ -603,7 +642,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             enableLocation();
         }
     }
-
     //checks status of permissions
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -645,7 +683,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         Intent intent = new Intent(MainActivity.this, SMSActivity.class);
         startActivity(intent);
     }
-
     //call using the cell service
     public void call(View view) {
         //create a variable for phone number
@@ -664,7 +701,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             Toast.makeText(MainActivity.this, "Please enter a valid telephone number", Toast.LENGTH_SHORT).show();
         }
     }
-
     //execute this method when app is started
     @SuppressWarnings("MissingPermission")
     @Override
@@ -680,21 +716,18 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         //start the map
         mapView.onStart();
     }
-
     //executed when map is paused and resumed
     @Override
     protected void onResume() {
         super.onResume();
         mapView.onResume();
     }
-
     //executed when map is paused
     @Override
     protected void onPause() {
         super.onPause();
         mapView.onPause();
     }
-
     //executed when the map is terminated
     @Override
     protected void onStop() {
@@ -775,7 +808,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 break;
         }
     }
-
     public LatLng getLocationFromAddress(Context context, String strAddress) {
         Geocoder coder = new Geocoder(context);
         List<Address> address;
